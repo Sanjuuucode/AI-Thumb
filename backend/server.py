@@ -10,7 +10,6 @@ import stripe
 import httpx
 from datetime import datetime, timezone, timedelta
 from dotenv import load_dotenv
-from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
 import logging
 import base64
 import aiofiles
