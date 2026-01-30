@@ -144,6 +144,67 @@ class QuickThumbAPITester:
             self.log_result("Stripe Webhook", False, str(e))
             return False
 
+    def test_authenticated_endpoints(self):
+        """Test authenticated endpoints with valid session token"""
+        if not self.session_token:
+            print("⚠️  No session token available for authenticated tests")
+            return False
+            
+        headers = {"Authorization": f"Bearer {self.session_token}"}
+        
+        # Test /auth/me
+        try:
+            response = requests.get(f"{self.base_url}/api/auth/me", headers=headers, timeout=10)
+            success = response.status_code == 200
+            if success:
+                user_data = response.json()
+                self.user_id = user_data.get('user_id')
+                print(f"✅ Auth Me (Valid Token) - User: {user_data.get('name', 'Unknown')}, Credits: {user_data.get('credits', 0)}")
+            else:
+                print(f"❌ Auth Me (Valid Token) - Status: {response.status_code}")
+            self.log_result("Auth Me (Valid Token)", success, f"Status: {response.status_code}" if not success else "")
+        except Exception as e:
+            self.log_result("Auth Me (Valid Token)", False, str(e))
+            return False
+            
+        # Test thumbnail generation
+        try:
+            data = {"text": "Test AI Tutorial", "style": "modern"}
+            response = requests.post(f"{self.base_url}/api/generate", json=data, headers=headers, timeout=30)
+            success = response.status_code == 200
+            if success:
+                result = response.json()
+                has_image = 'image' in result and result['image'].startswith('data:image/')
+                has_credits = 'credits' in result
+                success = has_image and has_credits
+                details = f"Image: {'✓' if has_image else '✗'}, Credits: {'✓' if has_credits else '✗'}"
+                print(f"✅ Thumbnail Generation - {details}")
+            else:
+                details = f"Status: {response.status_code}, Response: {response.text[:200]}"
+                print(f"❌ Thumbnail Generation - {details}")
+            self.log_result("Thumbnail Generation", success, details if not success else "")
+        except Exception as e:
+            self.log_result("Thumbnail Generation", False, str(e))
+            
+        # Test Stripe checkout
+        try:
+            response = requests.post(f"{self.base_url}/api/create-checkout-session", headers=headers, timeout=10)
+            success = response.status_code == 200
+            if success:
+                result = response.json()
+                has_url = 'url' in result and result['url']
+                success = has_url
+                details = f"URL: {result.get('url', 'Missing')[:50]}..."
+                print(f"✅ Stripe Checkout - {details}")
+            else:
+                details = f"Status: {response.status_code}, Response: {response.text[:100]}"
+                print(f"❌ Stripe Checkout - {details}")
+            self.log_result("Stripe Checkout (Authenticated)", success, details if not success else "")
+        except Exception as e:
+            self.log_result("Stripe Checkout (Authenticated)", False, str(e))
+            
+        return True
+
     def run_all_tests(self):
         """Run all backend API tests"""
         print("🚀 Starting QuickThumb Backend API Tests")
