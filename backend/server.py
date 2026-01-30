@@ -320,9 +320,10 @@ async def stripe_webhook(request: Request):
     payload = await request.body()
     sig_header = request.headers.get('stripe-signature')
     
+    webhook_secret = os.getenv("STRIPE_WEBHOOK_SECRET", "whsec_...")
     try:
         event = stripe.Webhook.construct_event(
-            payload, sig_header, "whsec_..." 
+            payload, sig_header, webhook_secret 
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail="Invalid payload")
