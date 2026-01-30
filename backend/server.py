@@ -279,7 +279,13 @@ PACKS = {
 
 @api_router.post("/create-checkout-session")
 async def create_checkout_session(req: CheckoutRequest, user: dict = Depends(get_current_user)):
-    frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:3000')
+    frontend_url = os.getenv('FRONTEND_URL')
+    if not frontend_url:
+        # Fallback only if absolutely necessary, but better to fail in prod if config is missing
+        # However, for this environment where I just added it, it should be fine.
+        # Let's trust the env var.
+        raise HTTPException(status_code=500, detail="FRONTEND_URL not configured")
+        
     success_url = f"{frontend_url}/dashboard?payment=success"
     
     pack = PACKS.get(req.pack_id)
