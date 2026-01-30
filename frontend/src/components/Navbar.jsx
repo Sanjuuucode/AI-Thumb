@@ -2,7 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Button } from './ui/button';
-import { Sparkles, LayoutGrid } from 'lucide-react';
+import { Sparkles, LayoutGrid, CreditCard } from 'lucide-react';
 
 export default function Navbar() {
   const { user, login, logout } = useAuth();
@@ -26,10 +26,13 @@ export default function Navbar() {
                     Dashboard
                  </Button>
               </Link>
-              <div className="flex items-center gap-2 px-3 py-1 bg-secondary rounded-full text-sm font-medium">
-                <span>{user.credits} Credits</span>
-              </div>
-              <Button onClick={logout} variant="outline">Logout</Button>
+              <Link to="/pricing">
+                  <div className="flex items-center gap-2 px-3 py-1 bg-secondary rounded-full text-sm font-medium hover:bg-secondary/80 transition-colors cursor-pointer">
+                    <CreditCard className="w-3 h-3 text-muted-foreground" />
+                    <span>{user.credits} Credits</span>
+                  </div>
+              </Link>
+              <Button onClick={logout} variant="outline" size="sm">Logout</Button>
             </>
           ) : (
             <>

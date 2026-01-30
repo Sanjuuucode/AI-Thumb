@@ -36,7 +36,8 @@ app = FastAPI()
 # Mount Static Files for Images
 # Ensure directory exists
 os.makedirs("static/images", exist_ok=True)
-app.mount("/static", StaticFiles(directory="static"), name="static")
+# IMPORTANT: Mount at /api/static so it routes to backend (port 8001) through ingress
+app.mount("/api/static", StaticFiles(directory="static"), name="static")
 
 api_router = APIRouter(prefix="/api")
 
@@ -192,13 +193,6 @@ async def logout(response: Response, request: Request):
 async def get_thumbnails(request: Request, user: dict = Depends(get_current_user)):
     thumbnails_cursor = db.thumbnails.find({"user_id": user["user_id"]}, {"_id": 0}).sort("created_at", -1)
     thumbnails = await thumbnails_cursor.to_list(length=100)
-    
-    # Process image URLs to be absolute if needed, or frontend handles relative.
-    # Currently stored as 'static/images/...'
-    # Let's ensure they are full URLs for easier frontend consumption, or keep relative.
-    # Frontend uses REACT_APP_BACKEND_URL, so let's keep them relative or prepend backend url here.
-    # Actually, let's keep them as path stored in DB, and frontend prepends backend URL.
-    
     return thumbnails
 
 @api_router.post("/generate")
@@ -264,9 +258,8 @@ async def generate_thumbnail(req: GenerateRequest, request: Request, user: dict 
             await f.write(img_bytes)
             
         # Save metadata with image URL
-        # URL logic: The backend is at REACT_APP_BACKEND_URL. The static mount is /static.
-        # So URL is /static/images/{filename}
-        image_url = f"/static/images/{filename}"
+        # NOTE: Now using /api/static/images/... to match the new mount point
+        image_url = f"/api/static/images/{filename}"
         
         thumb_id = str(uuid.uuid4())
         thumbnail = {
