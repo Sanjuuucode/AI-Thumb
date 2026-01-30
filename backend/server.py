@@ -62,6 +62,14 @@ class GenerateRequest(BaseModel):
     subject_image: str # Base64
     reference_image: str # Base64
 
+class ThumbnailResponse(BaseModel):
+    id: str
+    user_id: str
+    description: str
+    thumbnail_text: str
+    aspect_ratio: str
+    created_at: datetime
+
 # Auth Dependencies
 async def get_current_user(request: Request):
     session_token = request.cookies.get("session_token")
@@ -171,6 +179,17 @@ async def logout(response: Response, request: Request):
     return {"status": "logged out"}
 
 # --- GENERATION ---
+@api_router.get("/thumbnails", response_model=List[ThumbnailResponse])
+async def get_thumbnails(user: dict = Depends(get_current_user)):
+    thumbnails_cursor = db.thumbnails.find({"user_id": user["user_id"]}, {"_id": 0}).sort("created_at", -1)
+    thumbnails = await thumbnails_cursor.to_list(length=100)
+    
+    # Ensure datetime objects are timezone aware (if stored as naive) or valid for Pydantic
+    # MongoDB usually returns naive datetimes. Pydantic expects them or valid ISO strings.
+    # Our insert sets timezone.utc, so it should be fine.
+    
+    return thumbnails
+
 @api_router.post("/generate")
 async def generate_thumbnail(req: GenerateRequest, user: dict = Depends(get_current_user)):
     if user["credits"] <= 0:
