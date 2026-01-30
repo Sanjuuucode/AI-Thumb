@@ -1,0 +1,172 @@
+{
+  "identity": {
+    "name": "E1",
+    "mission": "Create a modern, minimal, yet emotionally resonant SaaS thumbnail generator.",
+    "principles": [
+      "Fusion over Imitation: Mix Swiss precision with Creator Economy vibrancy.",
+      "Emotion First: The tool should feel 'powerful' yet 'effortless'.",
+      "Content is King: The user's thumbnail is the hero; the UI is the stage.",
+      "Negative Space: Extreme breathing room to prevent 'tool fatigue'.",
+      "Contrast: Sharp black lines against soft backgrounds."
+    ]
+  },
+  "theme_strategy": {
+    "mode": "light",
+    "reasoning": "Light mode provides the best neutral canvas for color-critical work (thumbnail design). It evokes clarity and precision.",
+    "toggle_available": true
+  },
+  "typography": {
+    "headings": {
+      "font_family": "Clash Display, sans-serif",
+      "weights": ["500", "600"],
+      "usage": "Use for all major section headers and feature titles. Adds a 'tech-editorial' feel.",
+      "fallback": "sans-serif"
+    },
+    "body": {
+      "font_family": "Manrope, sans-serif",
+      "weights": ["400", "500"],
+      "usage": "Use for UI labels, instructions, and long-form text. Highly legible at small sizes.",
+      "fallback": "sans-serif"
+    },
+    "mono": {
+      "font_family": "JetBrains Mono, monospace",
+      "usage": "Use for values, coordinates, and technical data."
+    },
+    "installation": "Import via Google Fonts or Fontshare in index.css"
+  },
+  "colors": {
+    "palette": {
+      "primary": {
+        "name": "Obsidian Soft",
+        "hex": "#111111",
+        "usage": "Primary text, borders, high-emphasis buttons."
+      },
+      "background": {
+        "name": "Canvas White",
+        "hex": "#FAFAFA",
+        "usage": "Main app background. Avoid pure #FFFFFF to reduce eye strain."
+      },
+      "surface": {
+        "name": "Pure White",
+        "hex": "#FFFFFF",
+        "usage": "Cards, panels, inputs."
+      },
+      "accent": {
+        "name": "Electric Indigo",
+        "hex": "#4F46E5",
+        "usage": "Primary Call-to-Actions (Generate, Export). Use sparingly."
+      },
+      "secondary_accent": {
+        "name": "Lime Punch",
+        "hex": "#D9F99D",
+        "usage": "Success states, highlights, 'New' badges."
+      },
+      "border": {
+        "name": "Mist",
+        "hex": "#E5E5E5",
+        "usage": "Subtle dividers."
+      },
+      "error": {
+        "name": "Signal Red",
+        "hex": "#EF4444",
+        "usage": "Error states, destructive actions."
+      }
+    },
+    "gradients": {
+      "hero_glow": "radial-gradient(circle at 50% 50%, rgba(79, 70, 229, 0.15) 0%, rgba(250, 250, 250, 0) 70%)",
+      "subtle_mesh": "linear-gradient(120deg, #fdfbfb 0%, #ebedee 100%)"
+    }
+  },
+  "layout_system": {
+    "grid_strategy": "The Bento Grid (Mode A)",
+    "spacing": {
+      "base": "1rem",
+      "container_padding": "p-6 md:p-12",
+      "section_gap": "gap-12 md:gap-24"
+    },
+    "containers": {
+      "marketing": "max-w-7xl mx-auto",
+      "app": "w-full h-screen overflow-hidden flex"
+    }
+  },
+  "components": {
+    "buttons": {
+      "primary": "bg-primary text-white rounded-full px-8 py-3 hover:scale-105 transition-transform duration-200 shadow-lg hover:shadow-xl",
+      "secondary": "bg-white border border-gray-200 text-primary rounded-full px-8 py-3 hover:bg-gray-50 transition-colors",
+      "ghost": "text-gray-500 hover:text-primary hover:bg-gray-100 rounded-lg px-4 py-2"
+    },
+    "cards": {
+      "style": "bg-white border border-gray-100 rounded-2xl shadow-sm hover:shadow-md transition-shadow duration-300",
+      "padding": "p-6 or p-8"
+    },
+    "inputs": {
+      "style": "bg-gray-50 border-transparent focus:border-primary focus:bg-white rounded-lg px-4 py-3 transition-all duration-200 outline-none"
+    }
+  },
+  "visual_enhancers": {
+    "glassmorphism": {
+      "usage": "Floating toolbars and sticky headers.",
+      "classes": "bg-white/80 backdrop-blur-xl border-b border-white/20"
+    },
+    "shadows": {
+      "soft": "0 4px 20px -2px rgba(0, 0, 0, 0.05)",
+      "sharp": "4px 4px 0px 0px rgba(0,0,0,1)"
+    },
+    "textures": {
+      "noise": "Use a subtle SVG noise overlay at 2% opacity on the background to prevent digital flatness."
+    }
+  },
+  "motion": {
+    "transitions": "transition-all duration-300 ease-out",
+    "micro_interactions": "Buttons scale up 1.02x on hover. Inputs glow on focus.",
+    "page_load": "Staggered fade-in-up for grid items."
+  },
+  "image_assets": {
+    "hero_background": {
+      "url": "https://images.unsplash.com/photo-1761888856976-c4bc8303f65f?crop=entropy&cs=srgb&fm=jpg&q=85",
+      "description": "Soft orange abstract shapes on a light background. Use as a subtle backdrop for the hero section.",
+      "category": "background"
+    },
+    "feature_workspace": {
+      "url": "https://images.unsplash.com/photo-1622579521534-8252f7da47fd?crop=entropy&cs=srgb&fm=jpg&q=85",
+      "description": "Minimalist workspace with pencils. Represents the 'Creation' aspect.",
+      "category": "feature"
+    },
+    "thumbnail_examples": [
+      {
+        "url": "https://images.unsplash.com/photo-1750727548934-0e7fab8cb304?crop=entropy&cs=srgb&fm=jpg&q=85",
+        "description": "Vibrant geometric pattern. Use as a sample generated thumbnail."
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1766341055874-6541fa71db45?crop=entropy&cs=srgb&fm=jpg&q=85",
+        "description": "Concentric squares rainbow. Use as a sample generated thumbnail."
+      }
+    ]
+  },
+  "libraries": {
+    "icons": "lucide-react",
+    "charts": "recharts (via shadcn/ui)",
+    "3d": "None required for this MVP. Focus on 2D Canvas API for thumbnail generation."
+  },
+  "universal_guidelines": [
+    "Dark colors look good when used independently without gradients. DO NOT use dark colors as gradients",
+    "Don't make generic centered layouts, simplistic gradients, and uniform styling.",
+    "Create depth through layered design elements with z-index hierarchy",
+    "Use glass-morphism effects with backdrop filters (12-24px blur)",
+    "You MUST NOT apply universal transition. Eg: transition: all. This results in breaking transforms. Always add transitions for specific interactive elements like button, input excluding transforms",
+    "You MUST NOT center align the app container, ie do not add .App { text-align: center; } in the css file. This disrupts the human natural reading flow of text",
+    "Always use modern button styles like pill-shaped, or sharp button with interaction animations & color relevant to the app style",
+    "NEVER: use AI assistant Emoji characters like 🤖🧠💭💡🔮🎯📚🎭🎬🎪🎉🎊🎁🎀🎂🍰🎈🎨🎰💰💵💳🏦💎🪙💸🤑📊📈📉💹🔢🏆🥇 etc for icons.",
+    "Every interaction needs micro-animations - hover states, transitions, parallax effects, and entrance animations. Static = dead.",
+    "Use 2-3x more spacing than feels comfortable. Cramped designs look cheap.",
+    "Subtle grain textures, noise overlays, custom cursors, selection states, and loading animations: separates good from extraordinary.",
+    "Main agent relies on these image URLs. Missing categories (especially sponsor logos) = main agent will use placeholder text which is FORBIDDEN",
+    "Prioritize using pre-existing components from src/components/ui when applicable",
+    "Create new components that match the style and conventions of existing components when needed",
+    "Examine existing components to understand the project's component patterns before creating new ones",
+    "Components MUST use named exports (export const ComponentName = ...)",
+    "Pages MUST use default exports (export default function PageName() {...})",
+    "Use sonner for toasts. Sonner component are located in /app/src/components/ui/sonner.tsx"
+  ],
+  "instructions_to_main_agent": "1. Read this file completely. 2. Install 'Clash Display' and 'Manrope' fonts immediately. 3. Update tailwind.config.js with the new color palette. 4. Build the 'Editor' page first, focusing on the Canvas area. 5. Use the provided image URLs for the landing page showcase."
+}
