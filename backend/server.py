@@ -34,9 +34,7 @@ logger = logging.getLogger(__name__)
 app = FastAPI()
 
 # Mount Static Files for Images
-# Ensure directory exists
 os.makedirs("static/images", exist_ok=True)
-# IMPORTANT: Mount at /api/static so it routes to backend (port 8001) through ingress
 app.mount("/api/static", StaticFiles(directory="static"), name="static")
 
 api_router = APIRouter(prefix="/api")
@@ -62,14 +60,14 @@ class User(BaseModel):
     name: str
     picture: Optional[str] = None
     created_at: datetime
-    credits: int = 5  # Free credits
+    credits: int = 5
 
 class GenerateRequest(BaseModel):
     description: str
     thumbnail_text: str
-    aspect_ratio: str  # "16:9", "9:16", "1:1"
-    subject_image: str # Base64
-    reference_image: str # Base64
+    aspect_ratio: str
+    subject_image: str
+    reference_image: str
 
 class ThumbnailResponse(BaseModel):
     id: str
@@ -80,11 +78,13 @@ class ThumbnailResponse(BaseModel):
     image_url: Optional[str] = None
     created_at: datetime
 
+class CheckoutRequest(BaseModel):
+    pack_id: str
+
 # Auth Dependencies
 async def get_current_user(request: Request):
     session_token = request.cookies.get("session_token")
     if not session_token:
-        # Check header
         auth_header = request.headers.get("Authorization")
         if auth_header and auth_header.startswith("Bearer "):
             session_token = auth_header.split(" ")[1]
@@ -96,7 +96,6 @@ async def get_current_user(request: Request):
     if not session:
         raise HTTPException(status_code=401, detail="Invalid session")
         
-    # Check expiry
     expires_at = session["expires_at"]
     if isinstance(expires_at, str):
         expires_at = datetime.fromisoformat(expires_at)
@@ -138,7 +137,6 @@ async def get_session_data(request: Request, response: Response):
     name = data.get("name")
     picture = data.get("picture")
     
-    # Check if user exists
     user = await db.users.find_one({"email": email}, {"_id": 0})
     if not user:
         user_id = f"user_{uuid.uuid4().hex[:12]}"
@@ -153,7 +151,6 @@ async def get_session_data(request: Request, response: Response):
         await db.users.insert_one(new_user)
         user = new_user
     
-    # Create session
     session_token = str(uuid.uuid4())
     expires_at = datetime.now(timezone.utc) + timedelta(days=7)
     
@@ -164,7 +161,6 @@ async def get_session_data(request: Request, response: Response):
         "created_at": datetime.now(timezone.utc)
     })
     
-    # Set cookie
     response.set_cookie(
         key="session_token",
         value=session_token,
@@ -208,7 +204,6 @@ async def generate_thumbnail(req: GenerateRequest, request: Request, user: dict 
         )
         chat.with_model("gemini", "gemini-3-pro-image-preview").with_params(modalities=["image", "text"])
         
-        # Prepare the prompt
         prompt = f"""
         Create a high-quality YouTube thumbnail.
         
@@ -222,7 +217,6 @@ async def generate_thumbnail(req: GenerateRequest, request: Request, user: dict 
         Make it eye-catching, high contrast, and professional. 
         """
         
-        # Prepare file contents
         def clean_b64(b64_str):
             if "base64," in b64_str:
                 return b64_str.split("base64,")[1]
@@ -244,21 +238,17 @@ async def generate_thumbnail(req: GenerateRequest, request: Request, user: dict 
         if not images:
             raise HTTPException(status_code=500, detail="No image generated")
             
-        # Deduct credit
         await db.users.update_one({"user_id": user["user_id"]}, {"$inc": {"credits": -1}})
         
-        img_data_b64 = images[0]['data'] # base64 string
+        img_data_b64 = images[0]['data'] 
         img_bytes = base64.b64decode(img_data_b64)
         
-        # Save to disk
         filename = f"{uuid.uuid4()}.png"
         filepath = os.path.join("static/images", filename)
         
         async with aiofiles.open(filepath, "wb") as f:
             await f.write(img_bytes)
             
-        # Save metadata with image URL
-        # NOTE: Now using /api/static/images/... to match the new mount point
         image_url = f"/api/static/images/{filename}"
         
         thumb_id = str(uuid.uuid4())
@@ -273,7 +263,6 @@ async def generate_thumbnail(req: GenerateRequest, request: Request, user: dict 
         }
         await db.thumbnails.insert_one(thumbnail)
         
-        # Return base64 for immediate preview (faster than loading URL) AND the new credits
         return {"image": f"data:image/png;base64,{img_data_b64}", "credits": user["credits"] - 1}
         
     except Exception as e:
@@ -281,35 +270,49 @@ async def generate_thumbnail(req: GenerateRequest, request: Request, user: dict 
         raise HTTPException(status_code=500, detail=str(e))
 
 # --- STRIPE ---
+# Define pricing packs
+PACKS = {
+    "pack_starter": {"amount": 500, "credits": 50, "name": "Starter Pack (50 Credits)"},
+    "pack_pro": {"amount": 2500, "credits": 300, "name": "Pro Pack (300 Credits)"},
+    "pack_agency": {"amount": 5000, "credits": 700, "name": "Agency Pack (700 Credits)"}
+}
+
 @api_router.post("/create-checkout-session")
-async def create_checkout_session(user: dict = Depends(get_current_user)):
+async def create_checkout_session(req: CheckoutRequest, user: dict = Depends(get_current_user)):
     frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:3000')
     success_url = f"{frontend_url}/dashboard?payment=success"
     
+    pack = PACKS.get(req.pack_id)
+    if not pack:
+        raise HTTPException(status_code=400, detail="Invalid pack ID")
+
+    # In production, use real Stripe. Here, handle both.
     if STRIPE_KEY and not STRIPE_KEY.startswith("sk_test_4eC39"): 
         try:
             checkout_session = stripe.checkout.Session.create(
                 payment_method_types=['card'],
                 line_items=[{
                     'price_data': {
-                        'currency': 'usd',
+                        'currency': 'inr',
                         'product_data': {
-                            'name': '50 Credits Pack',
+                            'name': pack["name"],
                         },
-                        'unit_amount': 1000, # $10.00
+                        'unit_amount': pack["amount"] * 100, # amount in cents
                     },
                     'quantity': 1,
                 }],
                 mode='payment',
                 success_url=success_url,
                 cancel_url=f"{frontend_url}/pricing",
-                metadata={"user_id": user["user_id"]}
+                metadata={"user_id": user["user_id"], "credits": str(pack["credits"])}
             )
             return {"url": checkout_session.url}
         except Exception as e:
             logger.error(f"Stripe error: {e}")
             pass
             
+    # Mock fallback - Immediately grant credits for demo
+    await db.users.update_one({"user_id": user["user_id"]}, {"$inc": {"credits": pack["credits"]}})
     return {"url": success_url}
 
 @api_router.post("/webhook")
@@ -332,8 +335,9 @@ async def stripe_webhook(request: Request):
     if event_type == 'checkout.session.completed':
         session = data['data']['object']
         user_id = session.get('metadata', {}).get('user_id')
-        if user_id:
-             await db.users.update_one({"user_id": user_id}, {"$inc": {"credits": 50}})
+        credits = int(session.get('metadata', {}).get('credits', 0))
+        if user_id and credits > 0:
+             await db.users.update_one({"user_id": user_id}, {"$inc": {"credits": credits}})
              
     return {"status": "success"}
 

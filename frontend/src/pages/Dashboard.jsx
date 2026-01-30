@@ -5,6 +5,7 @@ import { Plus, Clock, Image as ImageIcon, Download, Coins } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { format } from 'date-fns';
+import { toast } from 'sonner';
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -30,9 +31,29 @@ export default function Dashboard() {
 
   const getImageUrl = (thumb) => {
     if (!thumb.image_url) return null;
-    // thumb.image_url now already contains /api/static/images/... 
-    // We just need to prepend the backend URL if it's not already absolute (it isn't)
     return `${process.env.REACT_APP_BACKEND_URL}${thumb.image_url}`;
+  };
+
+  const handleDownload = async (imageUrl, filename) => {
+    try {
+        const response = await fetch(imageUrl);
+        if (!response.ok) throw new Error('Network response was not ok');
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        toast.success("Download started");
+    } catch (error) {
+        console.error("Download failed:", error);
+        toast.error("Failed to download image. Try opening in new tab.");
+        window.open(imageUrl, '_blank');
+    }
   };
 
   return (
@@ -85,12 +106,10 @@ export default function Dashboard() {
                                     <ImageIcon className="w-8 h-8 text-muted-foreground/30" />
                                     <span className="text-xs text-muted-foreground">Load failed</span>
                                 </div>
-                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                    <a href={getImageUrl(thumb)} download={`thumbnail-${thumb.id}.png`} target="_blank" rel="noopener noreferrer">
-                                        <Button variant="secondary" size="sm" className="gap-2">
-                                            <Download className="w-4 h-4" /> Download
-                                        </Button>
-                                    </a>
+                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer" onClick={() => handleDownload(getImageUrl(thumb), `thumbnail-${thumb.id}.png`)}>
+                                    <Button variant="secondary" size="sm" className="gap-2 pointer-events-none">
+                                        <Download className="w-4 h-4" /> Download
+                                    </Button>
                                 </div>
                             </>
                          ) : (
