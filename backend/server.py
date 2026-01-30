@@ -9,7 +9,7 @@ import stripe
 import httpx
 from datetime import datetime, timezone, timedelta
 from dotenv import load_dotenv
-from emergentintegrations.llm.chat import LlmChat, UserMessage
+from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
 import logging
 import base64
 
@@ -55,21 +55,12 @@ class User(BaseModel):
     created_at: datetime
     credits: int = 5  # Free credits
 
-class Thumbnail(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    user_id: str
-    prompt: str
-    style: str
-    image_url: str  # We'll store base64 or a url if we upload it. For now, let's assume we return base64 to frontend and maybe save to DB if small enough, or just metadata.
-    # Actually, saving base64 to mongo is bad. 
-    # For this MVP, we will return the base64 to frontend, and if user "saves" it, we might store it.
-    # But better: store in mongo for now (limit 16MB). 
-    # Or just metadata.
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-
 class GenerateRequest(BaseModel):
-    text: str
-    style: str
+    description: str
+    thumbnail_text: str
+    aspect_ratio: str  # "16:9", "9:16", "1:1"
+    subject_image: str # Base64
+    reference_image: str # Base64
 
 # Auth Dependencies
 async def get_current_user(request: Request):
@@ -189,13 +180,43 @@ async def generate_thumbnail(req: GenerateRequest, user: dict = Depends(get_curr
         chat = LlmChat(
             api_key=EMERGENT_KEY, 
             session_id=f"gen_{user['user_id']}",
-            system_message="You are a professional graphic designer specializing in YouTube thumbnails."
+            system_message="You are a professional YouTube thumbnail designer. You are expert in creating high CTR thumbnails."
         )
         chat.with_model("gemini", "gemini-3-pro-image-preview").with_params(modalities=["image", "text"])
         
-        prompt = f"Create a YouTube thumbnail. Text: '{req.text}'. Style: {req.style}. Make it eye-catching, high contrast, professional."
+        # Prepare the prompt
+        prompt = f"""
+        Create a high-quality YouTube thumbnail.
         
-        msg = UserMessage(text=prompt)
+        Task:
+        1. Use the SUBJECT from the first image provided. Keep their likeness/appearance.
+        2. Use the STYLE and COMPOSITION from the second image provided (Reference).
+        3. The thumbnail aspect ratio must be {req.aspect_ratio}.
+        4. The overall scene description is: "{req.description}".
+        5. IMPORTANT: You MUST BAKE the following text into the image clearly and professionally: "{req.thumbnail_text}".
+        
+        Make it eye-catching, high contrast, and professional. 
+        """
+        
+        # Prepare file contents
+        # req.subject_image and req.reference_image should be base64 strings
+        # Remove header if present (data:image/jpeg;base64,...)
+        def clean_b64(b64_str):
+            if "base64," in b64_str:
+                return b64_str.split("base64,")[1]
+            return b64_str
+
+        subject_b64 = clean_b64(req.subject_image)
+        reference_b64 = clean_b64(req.reference_image)
+        
+        msg = UserMessage(
+            text=prompt,
+            file_contents=[
+                ImageContent(subject_b64),
+                ImageContent(reference_b64)
+            ]
+        )
+        
         text, images = await chat.send_message_multimodal_response(msg)
         
         if not images:
@@ -204,21 +225,17 @@ async def generate_thumbnail(req: GenerateRequest, user: dict = Depends(get_curr
         # Deduct credit
         await db.users.update_one({"user_id": user["user_id"]}, {"$inc": {"credits": -1}})
         
-        # In a real app, upload to S3. Here, return base64
-        # Also save metadata
         img_data = images[0]['data'] # base64 string
         
-        # Save to history (store truncated data or just metadata, assume frontend keeps base64 for now)
-        # We will store base64 for MVP simplicity, aware of mongo limits
+        # Save metadata
         thumb_id = str(uuid.uuid4())
         thumbnail = {
             "id": thumb_id,
             "user_id": user["user_id"],
-            "prompt": req.text,
-            "style": req.style,
+            "description": req.description,
+            "thumbnail_text": req.thumbnail_text,
+            "aspect_ratio": req.aspect_ratio,
             "created_at": datetime.now(timezone.utc),
-            # "image_data": img_data # Too large? Maybe. Let's risk it for MVP or just don't store image in db.
-            # Let's NOT store image in DB to be safe. We just return it.
         }
         await db.thumbnails.insert_one(thumbnail)
         
@@ -260,7 +277,6 @@ async def create_checkout_session(user: dict = Depends(get_current_user)):
             return {"url": checkout_session.url}
         except Exception as e:
             logger.error(f"Stripe error: {e}")
-            # Fallback to mock
             pass
             
     # Mock response
@@ -278,9 +294,6 @@ async def stripe_webhook(request: Request):
     except ValueError as e:
         raise HTTPException(status_code=400, detail="Invalid payload")
     except stripe.error.SignatureVerificationError as e:
-        # Just accept for test mode if signature fails (simulated)
-        # In real app, this is critical.
-        # For this MVP, we might trust the event type if we can't verify signature easily without correct secret
         pass
 
     # Handle event manually if signature verification skipped or passed
