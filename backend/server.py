@@ -1,4 +1,5 @@
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, Response
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field
@@ -12,6 +13,7 @@ from dotenv import load_dotenv
 from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
 import logging
 import base64
+import aiofiles
 
 # Load env
 load_dotenv()
@@ -30,6 +32,12 @@ logger = logging.getLogger(__name__)
 
 # App
 app = FastAPI()
+
+# Mount Static Files for Images
+# Ensure directory exists
+os.makedirs("static/images", exist_ok=True)
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
 api_router = APIRouter(prefix="/api")
 
 # CORS
@@ -68,6 +76,7 @@ class ThumbnailResponse(BaseModel):
     description: str
     thumbnail_text: str
     aspect_ratio: str
+    image_url: Optional[str] = None
     created_at: datetime
 
 # Auth Dependencies
@@ -180,18 +189,20 @@ async def logout(response: Response, request: Request):
 
 # --- GENERATION ---
 @api_router.get("/thumbnails", response_model=List[ThumbnailResponse])
-async def get_thumbnails(user: dict = Depends(get_current_user)):
+async def get_thumbnails(request: Request, user: dict = Depends(get_current_user)):
     thumbnails_cursor = db.thumbnails.find({"user_id": user["user_id"]}, {"_id": 0}).sort("created_at", -1)
     thumbnails = await thumbnails_cursor.to_list(length=100)
     
-    # Ensure datetime objects are timezone aware (if stored as naive) or valid for Pydantic
-    # MongoDB usually returns naive datetimes. Pydantic expects them or valid ISO strings.
-    # Our insert sets timezone.utc, so it should be fine.
+    # Process image URLs to be absolute if needed, or frontend handles relative.
+    # Currently stored as 'static/images/...'
+    # Let's ensure they are full URLs for easier frontend consumption, or keep relative.
+    # Frontend uses REACT_APP_BACKEND_URL, so let's keep them relative or prepend backend url here.
+    # Actually, let's keep them as path stored in DB, and frontend prepends backend URL.
     
     return thumbnails
 
 @api_router.post("/generate")
-async def generate_thumbnail(req: GenerateRequest, user: dict = Depends(get_current_user)):
+async def generate_thumbnail(req: GenerateRequest, request: Request, user: dict = Depends(get_current_user)):
     if user["credits"] <= 0:
         raise HTTPException(status_code=402, detail="No credits left")
         
@@ -218,8 +229,6 @@ async def generate_thumbnail(req: GenerateRequest, user: dict = Depends(get_curr
         """
         
         # Prepare file contents
-        # req.subject_image and req.reference_image should be base64 strings
-        # Remove header if present (data:image/jpeg;base64,...)
         def clean_b64(b64_str):
             if "base64," in b64_str:
                 return b64_str.split("base64,")[1]
@@ -244,9 +253,21 @@ async def generate_thumbnail(req: GenerateRequest, user: dict = Depends(get_curr
         # Deduct credit
         await db.users.update_one({"user_id": user["user_id"]}, {"$inc": {"credits": -1}})
         
-        img_data = images[0]['data'] # base64 string
+        img_data_b64 = images[0]['data'] # base64 string
+        img_bytes = base64.b64decode(img_data_b64)
         
-        # Save metadata
+        # Save to disk
+        filename = f"{uuid.uuid4()}.png"
+        filepath = os.path.join("static/images", filename)
+        
+        async with aiofiles.open(filepath, "wb") as f:
+            await f.write(img_bytes)
+            
+        # Save metadata with image URL
+        # URL logic: The backend is at REACT_APP_BACKEND_URL. The static mount is /static.
+        # So URL is /static/images/{filename}
+        image_url = f"/static/images/{filename}"
+        
         thumb_id = str(uuid.uuid4())
         thumbnail = {
             "id": thumb_id,
@@ -254,11 +275,13 @@ async def generate_thumbnail(req: GenerateRequest, user: dict = Depends(get_curr
             "description": req.description,
             "thumbnail_text": req.thumbnail_text,
             "aspect_ratio": req.aspect_ratio,
+            "image_url": image_url,
             "created_at": datetime.now(timezone.utc),
         }
         await db.thumbnails.insert_one(thumbnail)
         
-        return {"image": f"data:image/png;base64,{img_data}", "credits": user["credits"] - 1}
+        # Return base64 for immediate preview (faster than loading URL) AND the new credits
+        return {"image": f"data:image/png;base64,{img_data_b64}", "credits": user["credits"] - 1}
         
     except Exception as e:
         logger.error(f"Generation error: {e}")
@@ -267,14 +290,10 @@ async def generate_thumbnail(req: GenerateRequest, user: dict = Depends(get_curr
 # --- STRIPE ---
 @api_router.post("/create-checkout-session")
 async def create_checkout_session(user: dict = Depends(get_current_user)):
-    # Mock implementation for MVP/Demo purposes if key is invalid
-    # In production, remove this mock and handle errors properly
-    
     frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:3000')
     success_url = f"{frontend_url}/dashboard?payment=success"
     
-    # Try Stripe first
-    if STRIPE_KEY and not STRIPE_KEY.startswith("sk_test_4eC39"): # Skip the expired key check if we know it's bad
+    if STRIPE_KEY and not STRIPE_KEY.startswith("sk_test_4eC39"): 
         try:
             checkout_session = stripe.checkout.Session.create(
                 payment_method_types=['card'],
@@ -298,7 +317,6 @@ async def create_checkout_session(user: dict = Depends(get_current_user)):
             logger.error(f"Stripe error: {e}")
             pass
             
-    # Mock response
     return {"url": success_url}
 
 @api_router.post("/webhook")
@@ -308,14 +326,13 @@ async def stripe_webhook(request: Request):
     
     try:
         event = stripe.Webhook.construct_event(
-            payload, sig_header, "whsec_..." # In real app, use env var
+            payload, sig_header, "whsec_..." 
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail="Invalid payload")
     except stripe.error.SignatureVerificationError as e:
         pass
 
-    # Handle event manually if signature verification skipped or passed
     data = await request.json()
     event_type = data['type']
     

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/button';
-import { Plus, Clock, Image as ImageIcon } from 'lucide-react';
+import { Plus, Clock, Image as ImageIcon, Download } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { format } from 'date-fns';
@@ -28,6 +28,12 @@ export default function Dashboard() {
     fetchThumbnails();
   }, []);
 
+  const getImageUrl = (thumb) => {
+    if (!thumb.image_url) return null;
+    // image_url is stored as /static/images/filename.png
+    return `${process.env.REACT_APP_BACKEND_URL}${thumb.image_url}`;
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 py-10">
       <div className="flex items-center justify-between mb-10">
@@ -48,12 +54,28 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {thumbnails.map((thumb) => (
                 <div key={thumb.id} className="group relative bg-white border rounded-xl overflow-hidden hover:shadow-lg transition-all">
-                    {/* Placeholder for now since we don't store the image URL in DB yet. 
-                        In a real app, we'd upload to S3 and store the URL. 
-                        For now, we just show metadata. */}
-                    <div className="aspect-video bg-secondary flex items-center justify-center">
-                         <ImageIcon className="w-8 h-8 text-muted-foreground/30" />
-                         <span className="text-xs text-muted-foreground ml-2">Image not stored (MVP)</span>
+                    <div className="aspect-video bg-secondary flex items-center justify-center relative overflow-hidden">
+                         {getImageUrl(thumb) ? (
+                            <>
+                                <img 
+                                    src={getImageUrl(thumb)} 
+                                    alt={thumb.description} 
+                                    className="w-full h-full object-cover"
+                                />
+                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                    <a href={getImageUrl(thumb)} download={`thumbnail-${thumb.id}.png`}>
+                                        <Button variant="secondary" size="sm" className="gap-2">
+                                            <Download className="w-4 h-4" /> Download
+                                        </Button>
+                                    </a>
+                                </div>
+                            </>
+                         ) : (
+                            <div className="flex flex-col items-center gap-2">
+                                <ImageIcon className="w-8 h-8 text-muted-foreground/30" />
+                                <span className="text-xs text-muted-foreground">Image missing</span>
+                            </div>
+                         )}
                     </div>
                     
                     <div className="p-4">
