@@ -19,8 +19,8 @@ import aiofiles
 load_dotenv()
 
 # Config
-MONGO_URL = os.getenv("MONGO_URL", "mongodb://localhost:27017")
-DB_NAME = os.getenv("DB_NAME", "quickthumb_db")
+MONGO_URL = os.getenv("MONGO_URL")
+DB_NAME = os.getenv("DB_NAME")
 EMERGENT_KEY = os.getenv("EMERGENT_LLM_KEY")
 STRIPE_KEY = os.getenv("STRIPE_SECRET_KEY")
 
