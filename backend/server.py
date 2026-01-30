@@ -186,7 +186,11 @@ async def generate_thumbnail(req: GenerateRequest, user: dict = Depends(get_curr
         raise HTTPException(status_code=402, detail="No credits left")
         
     try:
-        chat = LlmChat(api_key=EMERGENT_KEY, session_id=f"gen_{user['user_id']}")
+        chat = LlmChat(
+            api_key=EMERGENT_KEY, 
+            session_id=f"gen_{user['user_id']}",
+            system_message="You are a professional graphic designer specializing in YouTube thumbnails."
+        )
         chat.with_model("gemini", "gemini-3-pro-image-preview").with_params(modalities=["image", "text"])
         
         prompt = f"Create a YouTube thumbnail. Text: '{req.text}'. Style: {req.style}. Make it eye-catching, high contrast, professional."
